@@ -342,10 +342,6 @@ def _dte_project_tree (project):
     sub_project = _com_property (project, 'SubProject')
     if sub_project:
         return [name, _dte_project_tree(sub_project)]
-    project_items = _com_property (project, 'ProjectItems')
-    if project_items:
-        lst_children = [_dte_project_tree(project_item) for project_item in project_items]
-        return [name, lst_children]
     return [name, []]
 
 def _com_property (object, attr, default=None):
