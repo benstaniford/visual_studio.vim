@@ -6,7 +6,13 @@ Copyright (c) 2003-2007 Michael Graz
 mgraz.vim@plan10.com
 '''
 
-import os, re, sys, time, pywintypes, win32com.client
+import os
+import re
+import sys
+import time
+import win32api
+import pywintypes
+import win32com.client
 
 import logging
 _logging_enabled = False
