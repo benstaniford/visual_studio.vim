@@ -192,7 +192,9 @@ def dte_output (vs_pid, fn_output, window_caption, notify=None):
         sel = window.Selection
     sel.SelectAll()
     lst_text = str(sel.Text).splitlines()
-    lst_text = _fix_filenames (os.path.dirname(dte.Solution.FullName), lst_text)
+    lst_text = _fix_filenames (
+        get_project_paths(get_projects(dte)),
+        lst_text)
     sel.Collapse()
     fp_output = file (fn_output, 'w')
     fp_output.write ('\n'.join(lst_text))
@@ -204,25 +206,40 @@ def dte_output (vs_pid, fn_output, window_caption, notify=None):
 
 #----------------------------------------------------------------------
 
+_project_build_start = re.compile(
+    r".*- Build started: Project: (.*), Config.*")
+
+def find_project_path(build_number, lst_text, current, paths):
+    for i in range(current, -1, -1):
+        line = lst_text[i]
+        if line.startswith(build_number):
+            m = _project_build_start.match(line)
+            if m:
+                return paths[m.group(1)]
+    return ""
+
 # Trying to match either
 # 1) '[path][fname]([line-no]) :'
 # 2) '[cpu]>[path][fname]([line-no])' : 
 # depending on whether parallel builds are enabled. If they are
 # we need to match 2) and get rid of the '[cpu]>' part.
-_fix_filenames_pattern = re.compile ('(\d+>)?(.*)\(\d+\) :')
+_fix_filenames_pattern = re.compile ('(\d+>)?(.*)(\(\d+\) :.*)')
 
-def _fix_filenames (dirname, lst_text):
-    '''Fixup the filenames if they are just relative to the solution'''
+def _fix_filenames (project_paths, lst_text):
     lst_result = []
-    for text in lst_text:
+    for i, text in enumerate(lst_text):
         m = _fix_filenames_pattern.match (text)
         if m:
             filename = m.group(2)
+            if filename.startswith('.\\'):
+                filename = filename[2:]
             text = text[m.end(1):]
             if not os.path.isfile(filename):
-                pathname = os.path.join (dirname, filename)
+                project_path = str(os.path.abspath(find_project_path(
+                    m.group(1), lst_text, i, project_paths)))
+                pathname = os.path.join (project_path, filename)
                 if os.path.isfile(pathname):
-                    text = pathname + text[m.end(2):]
+                    text = pathname + m.group(3)
         lst_result.append (text)
     return lst_result
 
@@ -277,6 +294,19 @@ def dte_list_instances (vs_pid):
 
 #----------------------------------------------------------------------
 
+def get_projects(dte):
+    return [project for project in dte.Solution.Projects]
+
+def get_project_paths(projects):
+    paths = {}
+    for p in projects:
+        try:
+            paths[p.Name] = os.path.dirname(os.path.relpath(p.FullName))
+        except ValueError:
+            # hopefully one of the weird projects
+            pass
+    return paths
+
 def dte_list_projects (vs_pid):
     logging.info ('== dte_list_projects %s' % vars())
     dte = _get_dte(vs_pid)
@@ -286,7 +316,7 @@ def dte_list_projects (vs_pid):
     startup_project_index = -1
     index = 0
     lst_result = []
-    lst_project = [project for project in dte.Solution.Projects]
+    lst_project = get_projects(dte)
     for project in sorted(dte.Solution.Projects, cmp=lambda x,y: cmp(x.Name, y.Name)):
         if project.Name == startup_project_name:
             startup_project_index = index
