@@ -204,7 +204,12 @@ def dte_output (vs_pid, fn_output, window_caption, notify=None):
 
 #----------------------------------------------------------------------
 
-_fix_filenames_pattern = re.compile ('(.*)\(\d+\) :')
+# Trying to match either
+# 1) '[path][fname]([line-no]) :'
+# 2) '[cpu]>[path][fname]([line-no])' : 
+# depending on whether parallel builds are enabled. If they are
+# we need to match 2) and get rid of the '[cpu]>' part.
+_fix_filenames_pattern = re.compile ('(\d+>)?(.*)\(\d+\) :')
 
 def _fix_filenames (dirname, lst_text):
     '''Fixup the filenames if they are just relative to the solution'''
@@ -212,11 +217,12 @@ def _fix_filenames (dirname, lst_text):
     for text in lst_text:
         m = _fix_filenames_pattern.match (text)
         if m:
-            filename = m.group(1)
+            filename = m.group(2)
+            text = text[m.end(1):]
             if not os.path.isfile(filename):
                 pathname = os.path.join (dirname, filename)
                 if os.path.isfile(pathname):
-                    text = pathname + text[m.end(1):]
+                    text = pathname + text[m.end(2):]
         lst_result.append (text)
     return lst_result
 
