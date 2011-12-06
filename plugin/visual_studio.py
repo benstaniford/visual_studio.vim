@@ -54,10 +54,10 @@ def dte_compile_file (vs_pid, fn_quickfix):
 
 def _dte_wait_for_build (dte):
     try:
-        while dte.Solution.SolutionBuild.BuildState == vsBuildStateInProgress:
+        while dte.Solution.SolutionBuild.BuildState != vsBuildStateDone:
             time.sleep (0.1)
     except:
-        pass
+        _dte_wait_for_build(dte)
 
 #----------------------------------------------------------------------
 
@@ -190,8 +190,24 @@ def dte_output (vs_pid, fn_output, window_caption, notify=None):
         sel = owp.TextDocument.Selection
     else:
         sel = window.Selection
-    sel.SelectAll()
-    lst_text = str(sel.Text).splitlines()
+    lst_text = []
+    def select_all():
+        sel.SelectAll()
+        return str(sel.Text).splitlines()
+    lst_text = select_all()
+    # the output window doesn't seem to be populated when the build is over
+    # so we'll look for the build complete message
+    if window_caption =='Output':
+        done = False
+        tried = 0
+        while not done and tried < 1000:
+            lst_text = select_all()
+            for line in reversed(lst_text):
+                if line.startswith('========== Build:'):
+                    done = True
+                    break
+            time.sleep (0.1)
+            tried += 1
     lst_text = _fix_filenames (
         get_project_paths(get_projects(dte)),
         lst_text)
