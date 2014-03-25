@@ -174,6 +174,35 @@ def dte_task_list (vs_pid, fn_quickfix):
 
 #----------------------------------------------------------------------
 
+def dte_error_list (vs_pid, fn_quickfix):
+    logging.info ('== dte_error_list %s' % vars())
+    fp_error_list = file (fn_quickfix, 'w')
+    dte = _get_dte(vs_pid)
+    dte.ExecuteCommand ('View.ErrorList')
+    if not dte: return
+    error_list = None
+    for window in dte.Windows:
+        if str(window.Caption).startswith('Error List'):
+            error_list = window
+    if not error_list:
+        _vim_msg ('Error: Error List window not active')
+        return
+    EL = error_list.Object
+    for i in range (1, EL.ErrorItems.Count+1):
+        ELItem = EL.ErrorItems.Item(i)
+        try: filename = ELItem.FileName
+        except: filename = '<no-filename>'
+        try: line = ELItem.Line
+        except: line = '<no-line>'
+        try: description = ELItem.Description
+        except: description = '<no-description>'
+        print >>fp_error_list, '%s(%s) : %s' % (filename, line, description)
+    fp_error_list.close ()
+    _vim_command ('call <Sid>DTEQuickfixOpen ("Error List")')
+    _vim_status ('VS Error list')
+
+#----------------------------------------------------------------------
+
 def dte_output (vs_pid, fn_output, window_caption, notify=None):
     logging.info ('== dte_output %s' % vars())
     if window_caption not in ['Find Results 1', 'Find Results 2', 'Output']:
