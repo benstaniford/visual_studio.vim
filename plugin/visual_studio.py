@@ -239,7 +239,7 @@ def find_project_path(build_number, lst_text, current, paths):
 # 2) '[cpu]>[path][fname]([line-no])' : 
 # depending on whether parallel builds are enabled. If they are
 # we need to match 2) and get rid of the '[cpu]>' part.
-_fix_filenames_pattern = re.compile ('(\d+>)?(.*)(\(\d+\) :.*)')
+_fix_filenames_pattern = re.compile ('(\d+>)?(.*)(\(\d+\)\s*:.*)')
 
 def _fix_filenames (project_paths, lst_text):
     lst_result = []
