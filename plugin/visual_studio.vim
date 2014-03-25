@@ -5,7 +5,7 @@
 "
 " Version 1.2 Sep-07
 " Support for multiple instances and startup projects
-" Thanks for the work of Henrik �hman <spiiph@hotmail.com>
+" Thanks for the work of Henrik Öhman <spiiph@hotmail.com>
 "
 " Version 1.1 May-04
 " Support for compiling & building
@@ -68,9 +68,6 @@ endif
 if ! exists ('g:visual_studio_quickfix_errorformat_task_list')
     let g:visual_studio_quickfix_errorformat_task_list = '%f(%l)\ %#:\ %#%m'
 endif
-if ! exists ('g:visual_studio_has_python')
-    let g:visual_studio_has_python = has('python')
-endif
 if ! exists ('g:visual_studio_python_exe')
     let g:visual_studio_python_exe = 'python.exe'
 endif
@@ -95,17 +92,11 @@ function! <Sid>PythonInit()
     if s:visual_studio_python_init
         return 1
     endif
-    if g:visual_studio_has_python
-        python import sys
-        exe 'python sys.path.append(r"'.s:visual_studio_location.'")'
-        exe 'python import '.s:visual_studio_module
-    else
-        call <Sid>PythonDllCheck()
-        if ! <Sid>PythonExeCheck()
-            return 0
-        endif
-        let s:visual_studio_module = '"'.s:visual_studio_location.'\'.s:visual_studio_module.'.py"'
+    call <Sid>PythonDllCheck()
+    if ! <Sid>PythonExeCheck()
+        return 0
     endif
+    let s:visual_studio_module = '"'.s:visual_studio_location.'\'.s:visual_studio_module.'.py"'
     let s:visual_studio_python_init = 1
     return 1
 endfunction
@@ -126,8 +117,8 @@ function! <Sid>PythonDllCheck()
     let dll_name = output[idx+len(srch):]
     let dll_name = substitute (dll_name, ' .*$', '', '')
     let dll_name = substitute (dll_name, '["\\]', '', 'g')
-    echo "\rVim has been been built with python DLL '".dll_name."' but it could not be loaded.  If this version of python is available to vim the result will be better performance of the visual_studio.vim plugin."
-    call input ('Type return to continue...')
+    " echo "\rVim has been been built with python DLL '".dll_name."' but it could not be loaded.  If this version of python is available to vim the result will be better performance of the visual_studio.vim plugin."
+    " call input ('Type return to continue...')
 endfunction
 
 "----------------------------------------------------------------------
@@ -161,7 +152,7 @@ endfunction
 
 "----------------------------------------------------------------------
 
-function! <Sid>DTEExec(fcn_py, ...)
+function! <Sid>DTEExec(fcn_py, is_async, ...)
     if ! <Sid>PythonInit()
         return
     endif
@@ -172,17 +163,22 @@ function! <Sid>DTEExec(fcn_py, ...)
         let arglist += ["\"" . pyarg . "\""]
     endfor
 
-    if g:visual_studio_has_python
-        let pyargs = join(arglist, ',')
-        exe 'python ' . s:visual_studio_module . '.' . a:fcn_py . '(' . pyargs . ')'
+    let pyargs = join(arglist, ' ')
+    let vim_pid = <Sid>GetPid()
+    if vim_pid > 0
+        let pyargs = pyargs . ' vim_pid=' . vim_pid
+    endif
+    " Here the output of the python script is executed as a vim command
+    let cmd = g:visual_studio_python_exe.' '.s:visual_studio_module.' '.a:fcn_py.' '.pyargs
+
+    if a:is_async
+        let env = {}
+        function env.get(temp_file) dict
+            call DTEOutput()
+        endfunction
+
+        call asynccommand#run(cmd, env)
     else
-        let pyargs = join(arglist, ' ')
-        let vim_pid = <Sid>GetPid()
-        if vim_pid > 0
-            let pyargs = pyargs . ' vim_pid=' . vim_pid
-        endif
-        " Here the output of the python script is executed as a vim command
-        let cmd = g:visual_studio_python_exe.' '.s:visual_studio_module.' '.a:fcn_py.' '.pyargs
         let result = system(cmd)
         exe result
     endif
@@ -195,17 +191,12 @@ function! DTEReload()
     if ! <Sid>PythonInit()
         return
     endif
-    if g:visual_studio_has_python
-        exe 'python reload ('.s:visual_studio_module.')'
-        exe 'python import '.s:visual_studio_module
-        echo s:visual_studio_module . ".py is reloaded."
-    endif
 endfunction
 
 "----------------------------------------------------------------------
 
 function! DTEGetFile()
-    call <Sid>DTEExec ('dte_get_file', &modified)
+    call <Sid>DTEExec ('dte_get_file', 0, &modified)
 endfunction
 
 "----------------------------------------------------------------------
@@ -216,7 +207,7 @@ function! DTEPutFile()
         echo 'No vim file!'
         return 0
     endif
-    call <Sid>DTEExec ('dte_put_file', filename, &modified, line('.'), col('.'))
+    call <Sid>DTEExec ('dte_put_file', 0, filename, &modified, line('.'), col('.'))
     return 1
 endfunction
 
@@ -224,21 +215,21 @@ endfunction
 
 function! DTETaskList()
     let &errorfile = g:visual_studio_task_list
-    call <Sid>DTEExec ('dte_task_list', &errorfile)
+    call <Sid>DTEExec ('dte_task_list', 0, &errorfile)
 endfunction
 
 "----------------------------------------------------------------------
 
 function! DTEErrorList()
     let &errorfile = g:visual_studio_error_list
-    call <Sid>DTEExec ('dte_error_list', &errorfile)
+    call <Sid>DTEExec ('dte_error_list', 0, &errorfile)
 endfunction
 
 "----------------------------------------------------------------------
 
 function! DTEOutput()
     let &errorfile = g:visual_studio_output
-    call <Sid>DTEExec ('dte_output', &errorfile, 'Output')
+    call <Sid>DTEExec ('dte_output', 0, &errorfile, 'Output')
 endfunction
 
 "----------------------------------------------------------------------
@@ -251,7 +242,7 @@ function! DTEFindResults(which)
         let &errorfile = g:visual_studio_find_results_2
         let window_caption = 'Find Results 2'
     endif
-    call <Sid>DTEExec ('dte_output', &errorfile, window_caption)
+    call <Sid>DTEExec ('dte_output', 0, &errorfile, window_caption)
 endfunction
 
 "----------------------------------------------------------------------
@@ -276,21 +267,29 @@ function! DTECompileFile()
     endif
     " NOTE: there used to be a cd (change directory) here but not anymore
     let &errorfile = g:visual_studio_output
-    call <Sid>DTEExec ('dte_compile_file', &errorfile)
+    call <Sid>DTEExec ('dte_compile_file', 0, &errorfile)
 endfunction
 
 "----------------------------------------------------------------------
 
 function! DTEBuildSolution()
     let &errorfile = g:visual_studio_output
-    call <Sid>DTEExec ('dte_build_solution', &errorfile, g:visual_studio_write_before_build)
+    if exists('g:loaded_asynccommand')
+        call <Sid>DTEExec ('dte_build_solution', 1, &errorfile, g:visual_studio_write_before_build)
+    else
+        call <Sid>DTEExec ('dte_build_solution', 0, &errorfile, g:visual_studio_write_before_build)
+    endif
 endfunction
 
 "----------------------------------------------------------------------
 
 function! DTEBuildStartupProject()
     let &errorfile = g:visual_studio_output
-    call <Sid>DTEExec ('dte_build_project', &errorfile, g:visual_studio_write_before_build)
+    if exists('g:loaded_asynccommand')
+        call <Sid>DTEExec ('dte_build_project', 1, &errorfile, g:visual_studio_write_before_build)
+    else
+        call <Sid>DTEExec ('dte_build_solution', 0, &errorfile, g:visual_studio_write_before_build)
+    endif
 endfunction
 
 "----------------------------------------------------------------------
@@ -303,7 +302,7 @@ function! DTEGetSolutions(...)
     let s:visual_studio_lst_dte = []
     " The following call will assign values to s:visual_studio_lst_dte
     echo 'Searching for Visual Studio instances ...'
-    call <Sid>DTEExec ('dte_list_instances')
+    call <Sid>DTEExec ('dte_list_instances', 0)
     call <Sid>DTESolutionGuiMenuCreate()
     if len(s:visual_studio_lst_dte) == 0
         echo 'No VisualStudio instances found'
@@ -392,7 +391,7 @@ function! DTEGetProjects(...)
     if verbose
         echo 'Retrieving Projects ...'
     endif
-    call <Sid>DTEExec ('dte_list_projects')
+    call <Sid>DTEExec ('dte_list_projects', 0)
     call <Sid>DTEProjectGuiMenuCreate()
     if len(s:visual_studio_lst_project) == 0
         if verbose
@@ -493,7 +492,7 @@ function! <Sid>DTEProjectMenuBuildChoice(which)
     let project_index = a:which - 1
     let project_name = s:visual_studio_lst_project[project_index][0]
     let &errorfile = g:visual_studio_output
-    call <Sid>DTEExec ('dte_build_project', &errorfile, g:visual_studio_write_before_build, project_name)
+    call <Sid>DTEExec ('dte_build_project', 0, &errorfile, g:visual_studio_write_before_build, project_name)
     return 1
 endfunction
 
@@ -503,7 +502,7 @@ function! <Sid>DTEProjectMenuStartupChoice(which)
     endif
     let project_index = a:which - 1
     let project_name = s:visual_studio_lst_project[project_index][0]
-    call <Sid>DTEExec ('dte_set_startup_project', project_name, project_index)
+    call <Sid>DTEExec ('dte_set_startup_project', 0, project_name, project_index)
     call <Sid>DTEProjectGuiMenuCreate()
     return 1
 endfunction
@@ -526,6 +525,7 @@ if has('gui') && ( ! exists('g:visual_studio_menu') || g:visual_studio_menu != 0
     amenu <silent> &VisualStudio.&Put\ File :call DTEPutFile()<cr>
     amenu <silent> &VisualStudio.-separator1- :
     amenu <silent> &VisualStudio.&Task\ List :call DTETaskList()<cr>
+    amenu <silent> &VisualStudio.&Error\ List :call DTEErrorList()<cr>
     amenu <silent> &VisualStudio.&Output :call DTEOutput()<cr>
     amenu <silent> &VisualStudio.&Find\ Results\ 1 :call DTEFindResults(1)<cr>
     amenu <silent> &VisualStudio.Find\ Results\ &2 :call DTEFindResults(2)<cr>
