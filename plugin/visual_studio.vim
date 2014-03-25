@@ -35,6 +35,9 @@ let g:tempfolder = substitute($TEMP, '\\', '\\\\', 'g')
 if ! exists ('g:visual_studio_task_list')
     let g:visual_studio_task_list = g:tempfolder.'\\vs_task_list.txt'
 endif
+if ! exists ('g:visual_studio_error_list')
+    let g:visual_studio_error_list = g:tempfolder.'\\vs_error_list.txt'
+endif
 if ! exists ('g:visual_studio_output')
     let g:visual_studio_output = g:tempfolder.'\\vs_output.txt'
 endif
@@ -222,6 +225,13 @@ endfunction
 function! DTETaskList()
     let &errorfile = g:visual_studio_task_list
     call <Sid>DTEExec ('dte_task_list', &errorfile)
+endfunction
+
+"----------------------------------------------------------------------
+
+function! DTEErrorList()
+    let &errorfile = g:visual_studio_error_list
+    call <Sid>DTEExec ('dte_error_list', &errorfile)
 endfunction
 
 "----------------------------------------------------------------------
@@ -538,6 +548,7 @@ if ! exists ('g:visual_studio_mapping') || g:visual_studio_mapping != 0
     nmap <silent> <Leader>vg :call DTEGetFile()<cr>
     nmap <silent> <Leader>vp :call DTEPutFile()<cr>
     nmap <silent> <Leader>vt :call DTETaskList()<cr>
+    nmap <silent> <Leader>ve :call DTEErrorList()<cr>
     nmap <silent> <Leader>vo :call DTEOutput()<cr>
     nmap <silent> <Leader>vf :call DTEFindResults(1)<cr>
     nmap <silent> <Leader>v2 :call DTEFindResults(2)<cr>
