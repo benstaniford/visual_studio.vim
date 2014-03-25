@@ -73,7 +73,7 @@ def dte_build_solution(vs_pid, fn_quickfix, write_first):
     if write_first != '0':
         _vim_command ('wall')
     _dte_activate (vs_pid)
-    _dte_output_activate (vs_pid)
+    #_dte_output_activate (vs_pid)
     try:
         dte.Solution.SolutionBuild.Build (1)
         # Build is not synchronous so we have to wait
@@ -103,7 +103,7 @@ def dte_build_project(vs_pid, fn_quickfix, write_first, project_name=None):
     if write_first != '0':
         _vim_command ('wall')
     _dte_activate (vs_pid)
-    _dte_output_activate (vs_pid)
+    #_dte_output_activate (vs_pid)
     try:
         configuration_name = dte.Solution.SolutionBuild.ActiveConfiguration.Name
         def get_project_unique_name(name):
