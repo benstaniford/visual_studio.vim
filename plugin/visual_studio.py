@@ -15,7 +15,7 @@ import pywintypes
 import win32com.client
 
 import logging
-_logging_enabled = False
+_logging_enabled = True
 if _logging_enabled:
     import tempfile
     _filename_log = os.path.join (tempfile.gettempdir(), 'visual_studio.log')
@@ -28,6 +28,7 @@ logging.info ('starting')
 vsBuildStateNotStarted = 1   # Build has not yet been started.
 vsBuildStateInProgress = 2   # Build is currently in progress.
 vsBuildStateDone = 3         # Build has been completed
+vsProjectKindProject = u'{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}'
 
 # Unfortunate side-effect - have to disable vim exit processing
 # otherwise there is an exception at exit
@@ -237,9 +238,10 @@ def dte_output (vs_pid, fn_output, window_caption, notify=None):
                     break
             time.sleep (0.1)
             tried += 1
-    lst_text = _fix_filenames (
-        get_project_paths(get_projects(dte)),
-        lst_text)
+    if window_caption not in ['Find Results 1', 'Find Results 2']:
+        lst_text = _fix_filenames (
+            get_project_paths(get_projects(dte)),
+            lst_text)
     sel.Collapse()
     fp_output = file (fn_output, 'w')
     fp_output.write ('\n'.join(lst_text))
@@ -339,8 +341,34 @@ def dte_list_instances (vs_pid):
 
 #----------------------------------------------------------------------
 
+def get_projects_from_folder(solution_folder):
+    projects = []
+    if solution_folder.ProjectItems:
+        for item in solution_folder.ProjectItems:
+            item = item.SubProject
+            if item:
+                if item.Kind == vsProjectKindProject:
+                    logging.info('== get_projects_from_folder found project:' + item.Name)
+                    projects.append(item)
+                else:
+                    projects = projects + get_projects_from_folder(item)
+    else:
+        projects.append(solution_folder)
+    return projects
+
+#----------------------------------------------------------------------
+
 def get_projects(dte):
-    return [project for project in dte.Solution.Projects]
+    projects = []
+    i = 0
+    for item in dte.Solution.Projects:
+        if item.Kind == vsProjectKindProject:
+            logging.info('== get_projects found project:' + item.Name)
+            projects.append(item)
+        else:
+            projects = projects + get_projects_from_folder(item)
+
+    return projects
 
 def get_project_paths(projects):
     paths = {}
