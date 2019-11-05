@@ -125,7 +125,7 @@ endfunction
 
 function! <Sid>PythonExeCheck()
     let output = system (g:visual_studio_python_exe.' -c "print 123"')
-    if output !~? '^123'
+    if output !~? '123'
         echo "\rERROR cannot run: ".g:visual_studio_python_exe
         echo "\rUpdate the system PATH or else set g:visual_studio_python_exe to a valid python.exe"
         return 0
